@@ -3,9 +3,11 @@ import datetime
 import pytz
 import random
 import threading
+import time
 from flask import Flask
 
 # --- CONFIGURATION ---
+# Ensure your token is inside 'quotes'
 API_TOKEN = '8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA'
 WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'   
 LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E' 
@@ -30,13 +32,12 @@ def generate_prediction_data():
     """Generates a complete prediction: Number, Color, Size"""
     predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     
-    # FIX: Explicitly defined arrays for Red numbers and Green numbers
-    if predicted_number in:
-        pred_color = "🔴 RED"
-        color_emoji = "🔴"
-    elif predicted_number in:
+    if predicted_number in [1, 3, 7, 9]:
         pred_color = "🟢 GREEN"
         color_emoji = "🟢"
+    elif predicted_number in [2, 4, 6, 8]:
+        pred_color = "🔴 RED"
+        color_emoji = "🔴"
     elif predicted_number == 0:
         pred_color = "🔴🟣 RED+VIOLET"
         color_emoji = "🔴"
@@ -117,9 +118,18 @@ def home():
     return "Wingo Predictor Bot Is Online!"
 
 def run_bot():
-    bot.infinity_polling(skip_pending=True)
+    # Loop indefinitely to restart polling if it crashes
+    while True:
+        try:
+            bot.infinity_polling(skip_pending=True)
+        except Exception as e:
+            time.sleep(5)
 
 if __name__ == "__main__":
+    # 1. Start the Telegram Bot in a separate background thread
     t = threading.Thread(target=run_bot)
     t.start()
+
+    # 2. Start the Flask Web Server on the main thread
+    # This must be LAST because app.run() blocks the script
     app.run(host="0.0.0.0", port=10000)

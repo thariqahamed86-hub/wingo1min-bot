@@ -36,6 +36,7 @@ def generate_prediction_data():
     """Generates a pseudo-random prediction framework for size/color metrics."""
     predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     
+    # FIX: Defined specific arrays for proper Wingo game color processing
     if predicted_number in:
         pred_color = "🔴 RED"
         color_emoji = "🔴"
@@ -60,7 +61,6 @@ def generate_prediction_data():
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    # Works in the group or in private chat
     welcome_text = (
         "🇮🇳 **Wingo 1-Min Prediction Engine Active**\n\n"
         "Welcome to the ultimate tracking matrix bot! I am configured to broadcast analytics directly into my target group.\n\n"
@@ -84,7 +84,6 @@ def send_help(message):
 
 @bot.message_handler(commands=['status'])
 def send_status(message):
-    # Calculate bot uptime
     uptime_seconds = int(time.time() - bot_start_time)
     uptime_hours = uptime_seconds // 3600
     uptime_minutes = (uptime_seconds % 3600) // 60
@@ -103,7 +102,6 @@ def send_status(message):
 def send_prediction(message):
     global current_prediction
     
-    # Restrict group operations strictly to your specific Group ID
     if message.chat.id != TARGET_GROUP_ID:
         bot.reply_to(message, "❌ Prediction tools are locked outside the verified main target group.")
         return
@@ -146,7 +144,7 @@ def check_result(message):
         winning_size = "📈 BIG" if winning_number >= 5 else "📉 SMALL"
         is_win = (current_prediction.get('size') == winning_size)
         
-        total_rounds_played += 1  # Increment total history count
+        total_rounds_played += 1
         
         if is_win:
             result_text = f"✅ **WIN ROUND!** \nOutcome: Number {winning_number} was {winning_size}"

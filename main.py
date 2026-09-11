@@ -35,7 +35,7 @@ LOSS_STICKER_ID = (
 
 if BOT_TOKEN == "8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA":
     raise ValueError(
-        "ERROR: Put your NEW Telegram bot token in BOT_TOKEN."
+        "ERROR: Put your NEW Telegram bot token."
     )
 
 

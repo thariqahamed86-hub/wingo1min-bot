@@ -1,185 +1,450 @@
-import telebot
+import os
+import time
 import datetime
-import pytz
 import random
 import threading
-import time
+
+import pytz
+import telebot
 from flask import Flask
 
-# --- CONFIGURATION ---
-API_TOKEN = '8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA'
-WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'   
-LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E' 
 
-# Target Telegram Group ID
-TARGET_GROUP_ID = 6842709265
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
-bot = telebot.TeleBot(API_TOKEN)
+# Put your NEW Telegram bot token in the environment variable
+BOT_TOKEN = os.getenv("8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA")
+
+# Example:
+# CHANNEL_ID = -1001234567890
+#
+# For a public channel, you can alternatively use:
+# CHANNEL_ID = "@YourChannelUsername"
+CHANNEL_ID = os.getenv("-1002835568642")
+
+WIN_STICKER_ID = os.getenv("CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E", "")
+LOSS_STICKER_ID = os.getenv("CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E", "")
+
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN is missing.")
+
+if not CHANNEL_ID:
+    raise ValueError("CHANNEL_ID is missing.")
+
+
+# Convert numeric channel ID from environment variable
+try:
+    CHANNEL_ID = int(CHANNEL_ID)
+except ValueError:
+    # Allows @ChannelUsername
+    pass
+
+
+bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# --- GLOBAL GAME VARIABLES ---
+
+# ============================================================
+# GLOBAL VARIABLES
+# ============================================================
+
 current_level = 1
 total_rounds_played = 0
-current_prediction = {}
+
+predictions = {}
+
 bot_start_time = time.time()
 
+state_lock = threading.Lock()
+
+
+# ============================================================
+# PERIOD CALCULATION
+# ============================================================
+
 def get_current_period_info():
-    """Calculates the exact Wingo 1-Min Period Number for India (IST)."""
-    tz = pytz.timezone('Asia/Kolkata')
+
+    tz = pytz.timezone("Asia/Kolkata")
+
     now = datetime.datetime.now(tz)
+
     total_minutes = now.hour * 60 + now.minute
+
     sequence = total_minutes + 1
-    date_str = now.strftime("%Y%m%d")
-    return f"{date_str}100{sequence:04d}"
 
-def generate_prediction_data():
-    """Generates a pseudo-random prediction framework for size/color metrics."""
-    predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    
-    # FIX: Defined specific arrays for proper Wingo game color processing
-    if predicted_number in [2, 4, 6, 8]:
-        pred_color = "🔴 RED"
-        color_emoji = "🔴"
-    elif predicted_number in [1, 3, 7, 9]:
-        pred_color = "🟢 GREEN"
-        color_emoji = "🟢"
-    elif predicted_number == 0:
-        pred_color = "🔴🟣 RED+VIOLET"
-        color_emoji = "🔴"
-    else:  # Number 5
-        pred_color = "🟢🟣 GREEN+VIOLET"
-        color_emoji = "🟢"
-        
-    if predicted_number >= 5:
-        pred_size = "📈 BIG"
+    date_string = now.strftime("%Y%m%d")
+
+    period_id = f"{date_string}100{sequence:04d}"
+
+    return period_id
+
+
+# ============================================================
+# GENERATE GAME GUESS
+# ============================================================
+
+def generate_prediction():
+
+    number = random.randint(0, 9)
+
+    # Color
+    if number in [2, 4, 6, 8]:
+
+        color = "🔴 RED"
+        emoji = "🔴"
+
+    elif number in [1, 3, 7, 9]:
+
+        color = "🟢 GREEN"
+        emoji = "🟢"
+
+    elif number == 0:
+
+        color = "🔴🟣 RED + VIOLET"
+        emoji = "🔴"
+
     else:
-        pred_size = "📉 SMALL"
-        
-    return predicted_number, pred_color, pred_size, color_emoji
 
-# --- TELEGRAM BOT ROUTING ENGINE ---
+        # Number 5
+        color = "🟢🟣 GREEN + VIOLET"
+        emoji = "🟢"
 
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    welcome_text = (
-        "🇮🇳 **Wingo 1-Min Prediction Engine Active**\n\n"
-        "Welcome to the ultimate tracking matrix bot! I am configured to broadcast analytics directly into my target group.\n\n"
-        "✨ **Type `/help` to see all available commands!**"
-    )
-    bot.reply_to(message, welcome_text, parse_mode='Markdown')
 
-@bot.message_handler(commands=['help'])
-def send_help(message):
-    help_text = (
-        "❓ **Wingo Bot Help & Commands Menu** ❓\n\n"
-        "⚙️ **General Commands:**\n"
-        "➡️ `/start` - Wake up the bot and view setup status.\n"
-        "➡️ `/help` - Show this commands explanation directory.\n"
-        "➡️ `/status` - Check active Martingale levels, uptime, and system health.\n\n"
-        "🎮 **Group Analysis Commands (Admins Only):**\n"
-        "➡️ `/predict` - Process and broadcast the next Wingo matrix calculation.\n"
-        "➡️ `/result [0-9]` - Input the final winning digit to resolve stats (e.g., `/result 7`)."
-    )
-    bot.reply_to(message, help_text, parse_mode='Markdown')
+    # Big / Small
+    if number >= 5:
 
-@bot.message_handler(commands=['status'])
-def send_status(message):
-    uptime_seconds = int(time.time() - bot_start_time)
-    uptime_hours = uptime_seconds // 3600
-    uptime_minutes = (uptime_seconds % 3600) // 60
-    
-    status_text = (
-        "📊 **SYSTEM STATUS REPORT** 📊\n\n"
-        f"🟢 **Bot Health:** `Optimal` (Running 24/7)\n"
-        f"⏳ **Uptime:** `{uptime_hours}h {uptime_minutes}m`\n"
-        f"📈 **Current Martingale Level:** `Level {current_level}`\n"
-        f"🔄 **Total Rounds Analyzed:** `{total_rounds_played}`\n"
-        f"👥 **Linked Target Group ID:** `{TARGET_GROUP_ID}`"
-    )
-    bot.reply_to(message, status_text, parse_mode='Markdown')
+        size = "📈 BIG"
 
-@bot.message_handler(commands=['predict'])
-def send_prediction(message):
-    global current_prediction
-    
-    if message.chat.id != TARGET_GROUP_ID:
-        bot.reply_to(message, "❌ Prediction tools are locked outside the verified main target group.")
-        return
+    else:
 
-    period_id = get_current_period_info()
-    num, color, size, emoji = generate_prediction_data()
-    
-    current_prediction = {
-        "period": period_id,
-        "number": num,
+        size = "📉 SMALL"
+
+
+    return number, color, size, emoji
+
+
+# ============================================================
+# CREATE PREDICTION
+# ============================================================
+
+def create_prediction():
+
+    period = get_current_period_info()
+
+    number, color, size, emoji = generate_prediction()
+
+
+    prediction = {
+        "period": period,
+        "number": number,
         "color": color,
-        "size": size
+        "size": size,
+        "emoji": emoji,
+        "created_at": time.time()
     }
-    
-    msg = (
-        f"🔥 **WINGO 1 MIN** 🔥\n\n"
-        f"📅 **Period No:** `{period_id}`\n"
-        f"📊 **BIG/SMALL:** {size}\n"
-        f"🎨 **COLOR:** {color}\n"
-        f"🔢 **NUMBER:** {emoji} {num} {emoji}\n\n"
-        f"💰 **Level:** {current_level} (Maint: X{current_level})"
-    )
-    
-    bot.send_message(TARGET_GROUP_ID, msg, parse_mode='Markdown')
 
-@bot.message_handler(commands=['result'])
-def check_result(message):
-    global current_level, current_prediction, total_rounds_played
-    
-    if message.chat.id != TARGET_GROUP_ID:
-        return
-        
+
+    with state_lock:
+
+        predictions[period] = prediction
+
+        level = current_level
+
+
+        # Keep only recent predictions
+        if len(predictions) > 20:
+
+            oldest = next(iter(predictions))
+
+            del predictions[oldest]
+
+
+    return prediction, level
+
+
+# ============================================================
+# SEND PREDICTION TO CHANNEL
+# ============================================================
+
+def send_prediction():
+
     try:
-        winning_number = int(message.text.split()[1])
-        
-        if winning_number < 0 or winning_number > 9:
-            bot.send_message(TARGET_GROUP_ID, "❌ Number must be between 0 and 9.")
-            return
-            
-        winning_size = "📈 BIG" if winning_number >= 5 else "📉 SMALL"
-        is_win = (current_prediction.get('size') == winning_size)
-        
-        total_rounds_played += 1
-        
-        if is_win:
-            result_text = f"✅ **WIN ROUND!** \nOutcome: Number {winning_number} was {winning_size}"
-            sticker_to_send = WIN_STICKER_ID
-            current_level = 1 
-        else:
-            result_text = f"❌ **LOSS ROUND** \nOutcome: Number {winning_number} was {winning_size}"
-            sticker_to_send = LOSS_STICKER_ID
-            current_level += 1 
-            
-        bot.send_message(TARGET_GROUP_ID, result_text, parse_mode='Markdown')
-        bot.send_sticker(TARGET_GROUP_ID, sticker_to_send)
-        bot.send_message(TARGET_GROUP_ID, f"🔄 **Next Investment Scale:** Level {current_level}\nUse `/predict` for upcoming matrix.")
-        
-    except (IndexError, ValueError):
-        bot.send_message(TARGET_GROUP_ID, "❌ Please type the trailing winning value. Example: `/result 3`")
-    except Exception as e:
-        print(f"Operational error encountered: {e}")
 
-# --- INTERNAL RENDER KEEP-ALIVE SERVER CONFIGURATION ---
-@app.route('/')
-def home():
-    return "Wingo Target Group Engine Online."
+        prediction, level = create_prediction()
 
-def run_bot_polling():
+        period = prediction["period"]
+        number = prediction["number"]
+        color = prediction["color"]
+        size = prediction["size"]
+        emoji = prediction["emoji"]
+
+
+        text = (
+            "🔥 *WINGO 1 MIN* 🔥\n\n"
+
+            f"📅 *PERIOD:* `{period}`\n\n"
+
+            f"📊 *BIG/SMALL:* {size}\n"
+
+            f"🎨 *COLOR:* {color}\n"
+
+            f"🔢 *NUMBER:* {emoji} `{number}` {emoji}\n\n"
+
+            f"📈 *LEVEL:* `{level}`\n\n"
+
+            "⚠️ Random game guess — "
+            "not guaranteed."
+        )
+
+
+        bot.send_message(
+            CHANNEL_ID,
+            text,
+            parse_mode="Markdown"
+        )
+
+
+        print(
+            f"Prediction sent successfully: {period}"
+        )
+
+
+    except Exception as error:
+
+        print(
+            f"Prediction sending error: {error}"
+        )
+
+
+# ============================================================
+# AUTOMATIC 1-MINUTE SYSTEM
+# ============================================================
+
+def automatic_prediction_loop():
+
+    print("Automatic prediction system started.")
+
+    last_period = None
+
+
     while True:
+
         try:
-            bot.infinity_polling(skip_pending=True)
-        except Exception as err:
-            print(f"Polling loop reset due to network variation: {err}")
+
+            current_period = get_current_period_info()
+
+
+            # Prevent duplicate posts
+            if current_period != last_period:
+
+                send_prediction()
+
+                last_period = current_period
+
+
+            # Check every 2 seconds
+            time.sleep(2)
+
+
+        except Exception as error:
+
+            print(
+                f"Automatic prediction error: {error}"
+            )
+
             time.sleep(5)
 
-if __name__ == "__main__":
-    polling_worker = threading.Thread(target=run_bot_polling)
-    polling_worker.daemon = True
-    polling_worker.start()
 
-    app.run(host="0.0.0.0", port=10000)
+# ============================================================
+# START COMMAND
+# ============================================================
+
+@bot.message_handler(commands=["start"])
+def start_command(message):
+
+    text = (
+        "🤖 *Wingo Channel Bot*\n\n"
+
+        "🟢 Bot is online.\n\n"
+
+        "This bot is configured to post "
+        "automatically to the Telegram channel.\n\n"
+
+        "Commands:\n"
+        "/start\n"
+        "/help\n"
+        "/status"
+    )
+
+
+    bot.reply_to(
+        message,
+        text,
+        parse_mode="Markdown"
+    )
+
+
+# ============================================================
+# HELP COMMAND
+# ============================================================
+
+@bot.message_handler(commands=["help"])
+def help_command(message):
+
+    text = (
+        "❓ *BOT HELP*\n\n"
+
+        "🤖 Automatic Mode:\n"
+        "The bot automatically creates one "
+        "game guess for each calculated period.\n\n"
+
+        "⚙️ Commands:\n"
+        "/start - Start bot\n"
+        "/help - Show help\n"
+        "/status - Show bot status"
+    )
+
+
+    bot.reply_to(
+        message,
+        text,
+        parse_mode="Markdown"
+    )
+
+
+# ============================================================
+# STATUS COMMAND
+# ============================================================
+
+@bot.message_handler(commands=["status"])
+def status_command(message):
+
+    uptime = int(
+        time.time() - bot_start_time
+    )
+
+    hours = uptime // 3600
+
+    minutes = (
+        uptime % 3600
+    ) // 60
+
+
+    with state_lock:
+
+        level = current_level
+
+        rounds = total_rounds_played
+
+
+    text = (
+        "📊 *BOT STATUS*\n\n"
+
+        "🟢 Status: `ONLINE`\n"
+
+        f"⏳ Uptime: `{hours}h {minutes}m`\n"
+
+        f"📈 Level: `{level}`\n"
+
+        f"🔄 Rounds: `{rounds}`\n"
+
+        f"📢 Channel: `{CHANNEL_ID}`"
+    )
+
+
+    bot.reply_to(
+        message,
+        text,
+        parse_mode="Markdown"
+    )
+
+
+# ============================================================
+# FLASK SERVER
+# ============================================================
+
+@app.route("/")
+def home():
+
+    return "Telegram Channel Bot is online."
+
+
+@app.route("/health")
+def health():
+
+    return {
+        "status": "online",
+        "uptime": int(
+            time.time() - bot_start_time
+        )
+    }
+
+
+# ============================================================
+# TELEGRAM POLLING
+# ============================================================
+
+def run_bot():
+
+    while True:
+
+        try:
+
+            print(
+                "Telegram polling started."
+            )
+
+
+            bot.infinity_polling(
+                skip_pending=True,
+                timeout=30,
+                long_polling_timeout=30
+            )
+
+
+        except Exception as error:
+
+            print(
+                f"Telegram polling error: {error}"
+            )
+
+            time.sleep(5)
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+if __name__ == "__main__":
+
+
+    # Telegram command thread
+    telegram_thread = threading.Thread(
+        target=run_bot,
+        daemon=True
+    )
+
+    telegram_thread.start()
+
+
+    # Automatic prediction thread
+    prediction_thread = threading.Thread(
+        target=automatic_prediction_loop,
+        daemon=True
+    )
+
+    prediction_thread.start()
+
+
+    # Web server
+    port = int(
+        os.getenv("PORT", "10000")
+    )
+
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )

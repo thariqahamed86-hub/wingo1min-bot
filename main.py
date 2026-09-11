@@ -37,10 +37,10 @@ def generate_prediction_data():
     predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     
     # FIX: Defined specific arrays for proper Wingo game color processing
-    if predicted_number in:
+    if predicted_number in [2, 4, 6, 8]:
         pred_color = "🔴 RED"
         color_emoji = "🔴"
-    elif predicted_number in:
+    elif predicted_number in [1, 3, 7, 9]:
         pred_color = "🟢 GREEN"
         color_emoji = "🟢"
     elif predicted_number == 0:

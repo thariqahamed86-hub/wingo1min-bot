@@ -14,7 +14,7 @@ from flask import Flask
 
 # IMPORTANT:
 # Replace this with your NEW token from @BotFather.
-BOT_TOKEN = "8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA"
+BOT_TOKEN = "8750268784:AAHRqnv0MebNMhfwuqetosJT3WvKWJ3oVPQ"
 
 # Your Telegram CHANNEL ID
 CHANNEL_ID = -1002835568642
@@ -33,7 +33,7 @@ LOSS_STICKER_ID = (
 # CHECK CONFIGURATION
 # ============================================================
 
-if BOT_TOKEN == "8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA":
+if BOT_TOKEN == "8750268784:AAHRqnv0MebNMhfwuqetosJT3WvKWJ3oVPQ":
     raise ValueError(
         "ERROR: Put your NEW Telegram bot token."
     )

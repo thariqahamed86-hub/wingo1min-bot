@@ -222,24 +222,18 @@ def send_prediction():
 
 
         message = (
-
-            "🔥 *WINGO 1 MIN* 🔥\n\n"
-
-            f"📅 *PERIOD NUMBER:* `{period}`\n\n"
-
-            f"📊 *BIG/SMALL:* {size}\n"
-
-            f"🎨 *COLOR:* {color}\n"
-
-            f"🔢 *NUMBER:* "
-            f"{emoji} `{number}` {emoji}\n\n"
-
-            f"📈 *LEVEL:* `{level}`\n\n"
-            
-            DM: @Maayan001,
-                @anonymoustele01,
-                @madexgurl
-        )
+    "🔥 *WINGO 1 MIN* 🔥\n\n"
+    f"📅 *PERIOD NUMBER:* `{period}`\n\n"
+    f"📊 *BIG/SMALL:* {size}\n"
+    f"🎨 *COLOR:* {color}\n"
+    f"🔢 *NUMBER:* {emoji} `{number}` {emoji}\n\n"
+    f"📈 *LEVEL:* `{level}`\n\n"
+    "📩 *DM FOR MORE DETAILS:*\n"
+    "@Maayan001\n"
+    "@anonymoustele01\n"
+    "@madexgurl\n\n"
+    "⚠️ Random game guess — not guaranteed."
+)
 
 
         bot.send_message(

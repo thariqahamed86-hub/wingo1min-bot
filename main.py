@@ -4,11 +4,11 @@ import pytz
 import random
 
 # --- CONFIGURATION ---
-API_TOKEN = 'YOUR_BOT_TOKEN_HERE'
-WIN_STICKER_ID = 'YOUR_WIN_STICKER_FILE_ID_HERE'   # Get from @idstickerbot
-LOSS_STICKER_ID = 'YOUR_LOSS_STICKER_FILE_ID_HERE' # Get from @idstickerbot
+API_TOKEN = '8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA'
+WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'   # Get from @idstickerbot
+LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E' # Get from @idstickerbot
 
-bot = telebot.TeleBot(API_TOKEN)
+bot = telebot.TeleBot(8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA)
 
 # --- GLOBAL VARIABLES ---
 # Martingale Strategy Level

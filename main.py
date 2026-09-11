@@ -10,8 +10,7 @@ API_TOKEN = '8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA'
 WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'   
 LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E' 
 
-# CRITICAL FIX: Wrapped API_TOKEN in quotes properly
-bot = telebot.TeleBot('8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA')
+bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
 # --- GLOBAL VARIABLES ---
@@ -31,17 +30,19 @@ def generate_prediction_data():
     """Generates a complete prediction: Number, Color, Size"""
     predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     
+    # FIX: Explicitly defined arrays for Red numbers and Green numbers
     if predicted_number in:
         pred_color = "🔴 RED"
         color_emoji = "🔴"
-    else:
+    elif predicted_number in:
         pred_color = "🟢 GREEN"
         color_emoji = "🟢"
-        
-    if predicted_number == 0:
+    elif predicted_number == 0:
         pred_color = "🔴🟣 RED+VIOLET"
-    elif predicted_number == 5:
+        color_emoji = "🔴"
+    else:  # Number 5
         pred_color = "🟢🟣 GREEN+VIOLET"
+        color_emoji = "🟢"
         
     if predicted_number >= 5:
         pred_size = "📈 BIG"
@@ -119,9 +120,6 @@ def run_bot():
     bot.infinity_polling(skip_pending=True)
 
 if __name__ == "__main__":
-    # Start bot script execution thread
     t = threading.Thread(target=run_bot)
     t.start()
-
-    # Launch Render standard HTTP port mapping web frame
     app.run(host="0.0.0.0", port=10000)

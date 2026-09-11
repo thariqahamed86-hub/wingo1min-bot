@@ -1,135 +1,146 @@
 import telebot
-import datetime
-import pytz
-import random
-import threading
+import requests
 import time
+import threading
+import random
 from flask import Flask
 
-# --- CONFIGURATION ---
-# Ensure your token is inside 'quotes'
+# --- USER CONFIGURATION ---
+# 1. Your Bot Token
 API_TOKEN = '8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA'
-WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'   
-LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E' 
+
+# 2. Your Sticker IDs
+WIN_STICKER_ID = 'CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E'
+LOSS_STICKER_ID = 'CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E'
+
+# 3. YOUR GAME API URL (The most important part)
+# Example: "https://91clubapi.com"
+GAME_API_URL = "https://draw.ar-lottery01.com/WinGo/WinGo_1M/GetHistoryIssuePage.json?ts=1789133040660" 
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
-# --- GLOBAL VARIABLES ---
+# --- VARIABLES ---
+last_processed_period = None
 current_level = 1
-current_prediction = {}
+current_prediction = {"period": None, "size": None}
 
-def get_current_period_info():
-    """Calculates the exact Wingo 1-Min Period Number for India (IST)."""
-    tz = pytz.timezone('Asia/Kolkata')
-    now = datetime.datetime.now(tz)
-    total_minutes = now.hour * 60 + now.minute
-    sequence = total_minutes + 1
-    date_str = now.strftime("%Y%m%d")
-    return f"{date_str}100{sequence:04d}"
-
-def generate_prediction_data():
-    """Generates a complete prediction: Number, Color, Size"""
-    predicted_number = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    
-    if predicted_number in [1, 3, 7, 9]:
-        pred_color = "🟢 GREEN"
-        color_emoji = "🟢"
-    elif predicted_number in [2, 4, 6, 8]:
-        pred_color = "🔴 RED"
-        color_emoji = "🔴"
-    elif predicted_number == 0:
-        pred_color = "🔴🟣 RED+VIOLET"
-        color_emoji = "🔴"
-    else:  # Number 5
-        pred_color = "🟢🟣 GREEN+VIOLET"
-        color_emoji = "🟢"
-        
-    if predicted_number >= 5:
-        pred_size = "📈 BIG"
-    else:
-        pred_size = "📉 SMALL"
-        
-    return predicted_number, pred_color, pred_size, color_emoji
-
-# --- TELEGRAM BOT COMMAND HANDLERS ---
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, "🇮🇳 **Wingo 1-Min Bot Ready!**\nUse /predict to start.")
-
-@bot.message_handler(commands=['predict'])
-def send_prediction(message):
-    global current_prediction
-    
-    period_id = get_current_period_info()
-    num, color, size, emoji = generate_prediction_data()
-    
-    current_prediction = {
-        "period": period_id,
-        "number": num,
-        "color": color,
-        "size": size
-    }
-    
-    msg = (
-        f"🔥 **WINGO 1 MIN** 🔥\n\n"
-        f"📅 **Period No:** `{period_id}`\n"
-        f"📊 **BIG/SMALL:** {size}\n"
-        f"🎨 **COLOR:** {color}\n"
-        f"🔢 **NUMBER:** {emoji} {num} {emoji}\n\n"
-        f"💰 **Level:** {current_level} (Maint: X{current_level})"
-    )
-    bot.reply_to(message, msg, parse_mode='Markdown')
-    bot.send_message(message.chat.id, "⏳ Wait for result... \n\nType `/result [Winning Number]` (e.g., `/result 6`) to check win/loss.")
-
-@bot.message_handler(commands=['result'])
-def check_result(message):
-    global current_level, current_prediction
-    
+def fetch_latest_result():
+    """Fetches the latest result from the real game API."""
     try:
-        winning_number = int(message.text.split()[1])
-        winning_size = "📈 BIG" if winning_number >= 5 else "📉 SMALL"
+        # Standard Wingo API Headers (Mimics a real phone)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)',
+            'Content-Type': 'application/json'
+        }
+        # Common Payload for Wingo History (Page 1)
+        payload = {"pageSize": 10, "pageNo": 1, "typeId": 1, "language": 0}
         
-        is_win = (current_prediction.get('size') == winning_size)
+        # We use POST because 99% of Wingo sites use POST for this
+        response = requests.post(GAME_API_URL, json=payload, headers=headers, timeout=5)
+        data = response.json()
         
-        if is_win:
-            result_text = f"✅ **WIN!** \nResult: {winning_number} was {winning_size}"
-            sticker_to_send = WIN_STICKER_ID
-            current_level = 1 
-        else:
-            result_text = f"❌ **LOSS** \nResult: {winning_number} was {winning_size}"
-            sticker_to_send = LOSS_STICKER_ID
-            current_level += 1 
-            
-        bot.reply_to(message, result_text, parse_mode='Markdown')
-        
-        if sticker_to_send:
-            bot.send_sticker(message.chat.id, sticker_to_send)
-            
-        bot.send_message(message.chat.id, f"🔄 **New Level:** {current_level}\nUse /predict for next round.")
-        
-    except Exception:
-        bot.reply_to(message, "❌ Please type the winning number. Example: `/result 5`")
+        # Extract the latest item (usually index 0)
+        latest_item = data['data']['list'][0]
+        return {
+            "period": str(latest_item['issueNumber']),
+            "number": int(latest_item['number']),
+            "size": "📈 BIG" if int(latest_item['number']) >= 5 else "📉 SMALL",
+            "color": "🟢 GREEN" if int(latest_item['number']) in [1,3,7,9,5] else "🔴 RED"
+        }
+    except Exception as e:
+        print(f"API Error: {e}")
+        return None
 
-# --- KEEP ALIVE WEB SERVER FOR RENDER ---
-@app.route('/')
-def home():
-    return "Wingo Predictor Bot Is Online!"
+def generate_prediction(next_period):
+    """Generates a forecast for the NEXT period."""
+    # (Here you can add complex logic based on history if you want)
+    pred_num = random.choice([0,1,2,3,4,5,6,7,8,9])
+    size = "📈 BIG" if pred_num >= 5 else "📉 SMALL"
+    color = "🔴 RED" if pred_num in [0,2,4,6,8] else "🟢 GREEN"
+    emoji = "🔴" if color == "🔴 RED" else "🟢"
+    if pred_num == 0: color = "🔴🟣 VIOLET"
+    if pred_num == 5: color = "🟢🟣 VIOLET"
+    
+    return {"period": next_period, "size": size, "color": color, "emoji": emoji, "number": pred_num}
 
-def run_bot():
-    # Loop indefinitely to restart polling if it crashes
+def send_message_to_channel(msg):
+    # Replace with your Channel ID or just reply to users
+    # For now, this prints to console. In a real bot, you'd broadcast or wait for user.
+    pass
+
+# --- AUTOMATED GAME LOOP ---
+def game_loop():
+    global last_processed_period, current_level, current_prediction
+    print("Background Game Monitor Started...")
+    
     while True:
         try:
-            bot.infinity_polling(skip_pending=True)
+            # 1. Get Real Data
+            result = fetch_latest_result()
+            
+            if result:
+                latest_period = result['period']
+                
+                # If we found a NEW result we haven't seen yet
+                if latest_period != last_processed_period:
+                    print(f"New Result Detected: {latest_period} -> {result['number']}")
+                    
+                    # A. CHECK WIN/LOSS (If we made a prediction for this period)
+                    if current_prediction['period'] == latest_period:
+                        won = (current_prediction['size'] == result['size'])
+                        
+                        if won:
+                            status = f"✅ **WIN!** Result: {result['number']} ({result['size']})"
+                            current_level = 1 # Reset
+                            # Send Win Sticker (You need to implement broadcast here if using channel)
+                        else:
+                            status = f"❌ **LOSS** Result: {result['number']} ({result['size']})"
+                            current_level += 1 # Martingale
+                            
+                        # Here you would typically bot.send_message(CHANNEL_ID, status)
+                        print(status)
+
+                    # B. PREDICT NEXT ROUND
+                    # Calculate next period ID (Simple +1 logic)
+                    next_period_int = int(latest_period) + 1
+                    next_period = str(next_period_int)
+                    
+                    pred = generate_prediction(next_period)
+                    current_prediction = pred
+                    
+                    msg = (
+                        f"🔥 **NEW PERIOD: {next_period}**\n"
+                        f"📊 Prediction: {pred['size']}\n"
+                        f"🎨 Color: {pred['color']}\n"
+                        f"💰 Level: {current_level}"
+                    )
+                    # For demo: just printing. 
+                    # To auto-send to a group, use: bot.send_message(CHAT_ID, msg)
+                    print(msg) 
+                    
+                    last_processed_period = latest_period
+                    
+            time.sleep(5) # Check every 5 seconds
+            
         except Exception as e:
-            time.sleep(5)
+            print(f"Loop Error: {e}")
+            time.sleep(10)
+
+# --- WEB SERVER ---
+@app.route('/')
+def index():
+    return "Bot is watching the game..."
+
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
 
 if __name__ == "__main__":
-    # 1. Start the Telegram Bot in a separate background thread
-    t = threading.Thread(target=run_bot)
-    t.start()
-
-    # 2. Start the Flask Web Server on the main thread
-    # This must be LAST because app.run() blocks the script
-    app.run(host="0.0.0.0", port=10000)
+    # 1. Start Game Monitor
+    threading.Thread(target=game_loop).start()
+    
+    # 2. Start Web Server
+    threading.Thread(target=run_flask).start()
+    
+    # 3. Start Bot
+    bot.infinity_polling(skip_pending=True)

@@ -1,4 +1,3 @@
-import os
 import time
 import datetime
 import random
@@ -13,36 +12,39 @@ from flask import Flask
 # CONFIGURATION
 # ============================================================
 
-# Put your NEW Telegram bot token in the environment variable
-BOT_TOKEN = os.getenv("8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA")
+# IMPORTANT:
+# Replace this with your NEW token from @BotFather.
+BOT_TOKEN = "8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA"
 
-# Example:
-# CHANNEL_ID = -1001234567890
-#
-# For a public channel, you can alternatively use:
-# CHANNEL_ID = "@YourChannelUsername"
-CHANNEL_ID = os.getenv("-1002835568642")
+# Your Telegram CHANNEL ID
+CHANNEL_ID = -1002835568642
 
-WIN_STICKER_ID = os.getenv("CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E", "")
-LOSS_STICKER_ID = os.getenv("CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E", "")
+# Sticker IDs
+WIN_STICKER_ID = (
+    "CAACAgUAAxkBAAER4h1qo_aDagqTDFeZsvVfXRWkHL1gMQACxiAAAlKt-FSX-5IBfGtcPz0E"
+)
 
-
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN is missing.")
-
-if not CHANNEL_ID:
-    raise ValueError("CHANNEL_ID is missing.")
+LOSS_STICKER_ID = (
+    "CAACAgUAAxkBAAER4h9qo_aX3jMiUFY5WnP-YiWldp1WOgACJg8AAhRQUVTAisD_A8dpDz0E"
+)
 
 
-# Convert numeric channel ID from environment variable
-try:
-    CHANNEL_ID = int(CHANNEL_ID)
-except ValueError:
-    # Allows @ChannelUsername
-    pass
+# ============================================================
+# CHECK CONFIGURATION
+# ============================================================
 
+if BOT_TOKEN == "8750268784:AAFiMexKhIRK1NidWa1KVUitkIMiJ337rOA":
+    raise ValueError(
+        "ERROR: Put your NEW Telegram bot token in BOT_TOKEN."
+    )
+
+
+# ============================================================
+# CREATE BOT
+# ============================================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
+
 app = Flask(__name__)
 
 
@@ -51,6 +53,7 @@ app = Flask(__name__)
 # ============================================================
 
 current_level = 1
+
 total_rounds_played = 0
 
 predictions = {}
@@ -61,7 +64,7 @@ state_lock = threading.Lock()
 
 
 # ============================================================
-# PERIOD CALCULATION
+# GET CURRENT PERIOD
 # ============================================================
 
 def get_current_period_info():
@@ -70,49 +73,68 @@ def get_current_period_info():
 
     now = datetime.datetime.now(tz)
 
-    total_minutes = now.hour * 60 + now.minute
+    total_minutes = (
+        now.hour * 60
+        + now.minute
+    )
 
     sequence = total_minutes + 1
 
     date_string = now.strftime("%Y%m%d")
 
-    period_id = f"{date_string}100{sequence:04d}"
+    period_id = (
+        f"{date_string}100{sequence:04d}"
+    )
 
     return period_id
 
 
 # ============================================================
-# GENERATE GAME GUESS
+# GENERATE RANDOM GAME GUESS
 # ============================================================
 
 def generate_prediction():
 
     number = random.randint(0, 9)
 
-    # Color
+
+    # --------------------------------------------------------
+    # COLOR
+    # --------------------------------------------------------
+
     if number in [2, 4, 6, 8]:
 
         color = "🔴 RED"
+
         emoji = "🔴"
+
 
     elif number in [1, 3, 7, 9]:
 
         color = "🟢 GREEN"
+
         emoji = "🟢"
+
 
     elif number == 0:
 
         color = "🔴🟣 RED + VIOLET"
+
         emoji = "🔴"
+
 
     else:
 
         # Number 5
         color = "🟢🟣 GREEN + VIOLET"
+
         emoji = "🟢"
 
 
-    # Big / Small
+    # --------------------------------------------------------
+    # BIG / SMALL
+    # --------------------------------------------------------
+
     if number >= 5:
 
         size = "📈 BIG"
@@ -133,16 +155,25 @@ def create_prediction():
 
     period = get_current_period_info()
 
-    number, color, size, emoji = generate_prediction()
+    number, color, size, emoji = (
+        generate_prediction()
+    )
 
 
     prediction = {
+
         "period": period,
+
         "number": number,
+
         "color": color,
+
         "size": size,
+
         "emoji": emoji,
+
         "created_at": time.time()
+
     }
 
 
@@ -153,12 +184,14 @@ def create_prediction():
         level = current_level
 
 
-        # Keep only recent predictions
+        # Keep only last 20 predictions
         if len(predictions) > 20:
 
-            oldest = next(iter(predictions))
+            oldest_period = next(
+                iter(predictions)
+            )
 
-            del predictions[oldest]
+            del predictions[oldest_period]
 
 
     return prediction, level
@@ -172,59 +205,76 @@ def send_prediction():
 
     try:
 
-        prediction, level = create_prediction()
+        prediction, level = (
+            create_prediction()
+        )
+
 
         period = prediction["period"]
+
         number = prediction["number"]
+
         color = prediction["color"]
+
         size = prediction["size"]
+
         emoji = prediction["emoji"]
 
 
-        text = (
+        message = (
+
             "🔥 *WINGO 1 MIN* 🔥\n\n"
 
-            f"📅 *PERIOD:* `{period}`\n\n"
+            f"📅 *PERIOD NUMBER:* `{period}`\n\n"
 
             f"📊 *BIG/SMALL:* {size}\n"
 
             f"🎨 *COLOR:* {color}\n"
 
-            f"🔢 *NUMBER:* {emoji} `{number}` {emoji}\n\n"
+            f"🔢 *NUMBER:* "
+            f"{emoji} `{number}` {emoji}\n\n"
 
             f"📈 *LEVEL:* `{level}`\n\n"
-
-            "⚠️ Random game guess — "
-            "not guaranteed."
+            
+            DM: @Maayan001,
+                @anonymoustele01,
+                @madexgurl
         )
 
 
         bot.send_message(
+
             CHANNEL_ID,
-            text,
+
+            message,
+
             parse_mode="Markdown"
+
         )
 
 
         print(
-            f"Prediction sent successfully: {period}"
+            f"Prediction sent: {period}"
         )
 
 
     except Exception as error:
 
         print(
-            f"Prediction sending error: {error}"
+            f"Prediction error: {error}"
         )
 
 
 # ============================================================
-# AUTOMATIC 1-MINUTE SYSTEM
+# AUTOMATIC PREDICTION LOOP
 # ============================================================
 
 def automatic_prediction_loop():
 
-    print("Automatic prediction system started.")
+    print(
+        "Automatic prediction system started."
+    )
+
 
     last_period = None
 
@@ -233,10 +283,12 @@ def automatic_prediction_loop():
 
         try:
 
-            current_period = get_current_period_info()
+            current_period = (
+                get_current_period_info()
+            )
 
 
-            # Prevent duplicate posts
+            # Send only once per period
             if current_period != last_period:
 
                 send_prediction()
@@ -251,71 +303,90 @@ def automatic_prediction_loop():
         except Exception as error:
 
             print(
-                f"Automatic prediction error: {error}"
+                f"Automatic loop error: {error}"
             )
 
             time.sleep(5)
 
 
 # ============================================================
-# START COMMAND
+# /START
 # ============================================================
 
 @bot.message_handler(commands=["start"])
 def start_command(message):
 
     text = (
+
         "🤖 *Wingo Channel Bot*\n\n"
 
         "🟢 Bot is online.\n\n"
 
-        "This bot is configured to post "
-        "automatically to the Telegram channel.\n\n"
+        "The bot is configured to "
+        "automatically post to the channel.\n\n"
 
         "Commands:\n"
-        "/start\n"
-        "/help\n"
-        "/status"
+
+        "/start - Start bot\n"
+
+        "/help - Show help\n"
+
+        "/status - Show status"
+
     )
 
 
     bot.reply_to(
+
         message,
+
         text,
+
         parse_mode="Markdown"
+
     )
 
 
 # ============================================================
-# HELP COMMAND
+# /HELP
 # ============================================================
 
 @bot.message_handler(commands=["help"])
 def help_command(message):
 
     text = (
+
         "❓ *BOT HELP*\n\n"
 
         "🤖 Automatic Mode:\n"
-        "The bot automatically creates one "
-        "game guess for each calculated period.\n\n"
+
+        "The bot creates one random game "
+        "guess for each calculated period.\n\n"
 
         "⚙️ Commands:\n"
+
         "/start - Start bot\n"
+
         "/help - Show help\n"
+
         "/status - Show bot status"
+
     )
 
 
     bot.reply_to(
+
         message,
+
         text,
+
         parse_mode="Markdown"
+
     )
 
 
 # ============================================================
-# STATUS COMMAND
+# /STATUS
 # ============================================================
 
 @bot.message_handler(commands=["status"])
@@ -324,6 +395,7 @@ def status_command(message):
     uptime = int(
         time.time() - bot_start_time
     )
+
 
     hours = uptime // 3600
 
@@ -340,6 +412,7 @@ def status_command(message):
 
 
     text = (
+
         "📊 *BOT STATUS*\n\n"
 
         "🟢 Status: `ONLINE`\n"
@@ -350,35 +423,49 @@ def status_command(message):
 
         f"🔄 Rounds: `{rounds}`\n"
 
-        f"📢 Channel: `{CHANNEL_ID}`"
+        f"📢 Channel ID: `{CHANNEL_ID}`"
+
     )
 
 
     bot.reply_to(
+
         message,
+
         text,
+
         parse_mode="Markdown"
+
     )
 
 
 # ============================================================
-# FLASK SERVER
+# FLASK HOME
 # ============================================================
 
 @app.route("/")
 def home():
 
-    return "Telegram Channel Bot is online."
+    return (
+        "Telegram Channel Bot is online."
+    )
 
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
 
 @app.route("/health")
 def health():
 
     return {
+
         "status": "online",
+
         "uptime": int(
             time.time() - bot_start_time
         )
+
     }
 
 
@@ -398,9 +485,13 @@ def run_bot():
 
 
             bot.infinity_polling(
+
                 skip_pending=True,
+
                 timeout=30,
+
                 long_polling_timeout=30
+
             )
 
 
@@ -420,31 +511,49 @@ def run_bot():
 if __name__ == "__main__":
 
 
-    # Telegram command thread
+    # --------------------------------------------------------
+    # TELEGRAM THREAD
+    # --------------------------------------------------------
+
     telegram_thread = threading.Thread(
+
         target=run_bot,
+
         daemon=True
+
     )
 
     telegram_thread.start()
 
 
-    # Automatic prediction thread
+    # --------------------------------------------------------
+    # AUTOMATIC PREDICTION THREAD
+    # --------------------------------------------------------
+
     prediction_thread = threading.Thread(
+
         target=automatic_prediction_loop,
+
         daemon=True
+
     )
 
     prediction_thread.start()
 
 
-    # Web server
-    port = int(
-        os.getenv("PORT", "10000")
+    # --------------------------------------------------------
+    # FLASK SERVER
+    # --------------------------------------------------------
+
+    print(
+        "Starting Flask server..."
     )
 
 
     app.run(
+
         host="0.0.0.0",
-        port=port
+
+        port=10000
+
     )
